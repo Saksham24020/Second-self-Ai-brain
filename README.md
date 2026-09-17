@@ -6,6 +6,7 @@
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.35+-FF4B4B?style=flat&logo=streamlit&logoColor=white)](https://streamlit.io)
 [![Vector Search](https://img.shields.io/badge/FAISS-Vector%20Index-00599C?style=flat)](https://github.com/facebookresearch/faiss)
 [![LLM Engine](https://img.shields.io/badge/Groq-Llama%203.1-F55036?style=flat)](https://groq.com)
+[![Run Tests](https://github.com/Saksham24020/Second-self-Ai-brain/actions/workflows/test.yml/badge.svg)](https://github.com/Saksham24020/Second-self-Ai-brain/actions/workflows/test.yml)
 [![Tests](https://img.shields.io/badge/pytest-13%20passed-brightgreen?style=flat&logo=pytest&logoColor=white)](https://pytest.org)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
