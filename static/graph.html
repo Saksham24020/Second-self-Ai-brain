@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SecondSelf &mdash; Knowledge Graph</title>
+  <meta name="description" content="Interactive knowledge graph for SecondSelf: explore connections between your captured notes." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        hsl(222, 20%, 8%);
+      --surface:   hsl(222, 18%, 13%);
+      --surface2:  hsl(222, 16%, 18%);
+      --border:    hsl(222, 16%, 22%);
+      --text:      hsl(210, 20%, 90%);
+      --muted:     hsl(210, 12%, 55%);
+      --accent:    hsl(207, 90%, 60%);
+      --archives:  hsl(280, 70%, 60%);
+      --areas:     hsl(150, 65%, 50%);
+      --projects:  hsl(35,  85%, 58%);
+      --resources: hsl(207, 85%, 58%);
+      --tag-edge:  hsl(207, 40%, 40%);
+      --sem-edge:  hsl(150, 60%, 45%);
+      --radius:    12px;
+      --sidebar-w: 300px;
+    }
+
+    html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; }
+
+    /* ── Layout ───────────────────────────────────────────── */
+    #app { display: flex; height: 100vh; }
+
+    /* ── Sidebar ──────────────────────────────────────────── */
+    #sidebar {
+      width: var(--sidebar-w);
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 24px 20px;
+      gap: 20px;
+      overflow-y: auto;
+      z-index: 10;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent), hsl(260,80%,65%));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .brand-name { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+    .brand-sub  { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+    #search {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 12px;
+      color: var(--text);
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color .2s;
+    }
+    #search::placeholder { color: var(--muted); }
+    #search:focus { border-color: var(--accent); }
+
+    /* Stats strip */
+    #stats {
+      display: flex; gap: 12px;
+    }
+    .stat {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+    }
+    .stat-value { font-size: 20px; font-weight: 700; color: var(--accent); }
+    .stat-label { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+    /* Legend */
+    .section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+    .legend { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .legend-line { width: 20px; height: 2px; border-radius: 1px; flex-shrink: 0; }
+
+    /* Node detail panel */
+    #node-detail {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      font-size: 13px;
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+    }
+    #node-detail.visible { display: flex; }
+    #node-title { font-size: 14px; font-weight: 600; line-height: 1.4; word-break: break-word; }
+    #node-category { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .8px; }
+    #node-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+    .tag-chip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 2px 8px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    #node-summary { color: var(--muted); line-height: 1.6; font-size: 12px; }
+    #node-connections { color: var(--muted); font-size: 12px; }
+    #node-placeholder { color: var(--muted); font-size: 12px; font-style: italic; }
+
+    /* Controls */
+    .controls { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
+    .btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 12px;
+      font-family: inherit;
+      padding: 8px 12px;
+      cursor: pointer;
+      text-align: center;
+      transition: background .15s, border-color .15s;
+    }
+    .btn:hover { background: var(--border); border-color: var(--accent); }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+    .btn.primary:hover { background: hsl(207,90%,52%); }
+
+    /* ── Graph canvas ─────────────────────────────────────── */
+    #graph-area { flex: 1; position: relative; }
+    #network { width: 100%; height: 100%; }
+
+    /* Loading overlay */
+    #loader {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg);
+      flex-direction: column; gap: 14px;
+      z-index: 50;
+      transition: opacity .4s;
+    }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loader-text { font-size: 13px; color: var(--muted); }
+
+    /* Tooltip override */
+    .vis-tooltip {
+      background: var(--surface) !important;
+      border: 1px solid var(--border) !important;
+      color: var(--text) !important;
+      border-radius: 6px !important;
+      font-family: 'Inter', sans-serif !important;
+      font-size: 12px !important;
+      padding: 6px 10px !important;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <div class="brand">
+      <div class="brand-icon">&#127760;</div>
+      <div>
+        <div class="brand-name">SecondSelf</div>
+        <div class="brand-sub">Knowledge Graph</div>
+      </div>
+    </div>
+
+    <input id="search" type="text" placeholder="Search notes&hellip;" autocomplete="off" />
+
+    <div id="stats">
+      <div class="stat"><div class="stat-value" id="stat-nodes">—</div><div class="stat-label">Notes</div></div>
+      <div class="stat"><div class="stat-value" id="stat-edges">—</div><div class="stat-label">Links</div></div>
+    </div>
+
+    <div>
+      <div class="section-title">Categories</div>
+      <div class="legend" style="margin-top:8px">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--archives)"></div>Archives</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--areas)"></div>Areas</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--projects)"></div>Projects</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--resources)"></div>Resources</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">Edge types</div>
+      <div class="legend" style="margin-top:8px">
+        <div class="legend-item"><div class="legend-line" style="background:var(--sem-edge)"></div>Semantic similarity</div>
+        <div class="legend-item"><div class="legend-line" style="background:var(--tag-edge)"></div>Shared tag</div>
+      </div>
+    </div>
+
+    <!-- Node detail -->
+    <div id="node-detail">
+      <div id="node-title">—</div>
+      <div id="node-category"></div>
+      <div id="node-tags"></div>
+      <div id="node-summary"></div>
+      <div id="node-connections"></div>
+    </div>
+    <div id="node-placeholder">Click a node to see details</div>
+
+    <div class="controls">
+      <button class="btn" id="btn-fit">&#8982; Fit to view</button>
+      <button class="btn" id="btn-reset-filter">&#x2715; Clear filter</button>
+    </div>
+  </aside>
+
+  <!-- Graph -->
+  <div id="graph-area">
+    <div id="loader">
+      <div class="spinner"></div>
+      <div id="loader-text">Loading graph&hellip;</div>
+    </div>
+    <div id="network"></div>
+  </div>
+</div>
+
+<script>
+(async () => {
+  const CAT_COLORS = {
+    Archives:  { bg: 'hsl(280,70%,55%)',  border: 'hsl(280,70%,40%)' },
+    Areas:     { bg: 'hsl(150,65%,45%)',  border: 'hsl(150,65%,32%)' },
+    Projects:  { bg: 'hsl(35,85%,52%)',   border: 'hsl(35,85%,38%)'  },
+    Resources: { bg: 'hsl(207,85%,55%)',  border: 'hsl(207,85%,40%)' },
+  };
+  const EDGE_COLORS = {
+    semantic: { color: 'hsl(150,50%,40%)', highlight: 'hsl(150,60%,55%)' },
+    tag:      { color: 'hsl(207,35%,38%)', highlight: 'hsl(207,50%,55%)' },
+  };
+
+  const loader    = document.getElementById('loader');
+  const loaderTxt = document.getElementById('loader-text');
+
+  // Load graph data (from inlined global if embedded in iframe, or fetch sibling graph.json)
+  let rawGraph = window.__INITIAL_GRAPH__ || null;
+  if (!rawGraph) {
+    try {
+      const res = await fetch('graph.json');
+      if (res.ok) {
+        rawGraph = await res.json();
+      }
+    } catch (err) {
+      console.warn('Direct fetch failed, waiting for data:', err);
+    }
+  }
+
+  if (!rawGraph) {
+    loaderTxt.textContent = 'Knowledge graph data is empty or not yet generated.';
+    return;
+  }
+
+  // Build vis datasets
+  const nodeMap = {};
+  rawGraph.nodes.forEach(n => { nodeMap[n.id] = n; });
+
+  const visNodes = new vis.DataSet(rawGraph.nodes.map(n => {
+    const cat = n.category || 'Resources';
+    const col = CAT_COLORS[cat] || CAT_COLORS.Resources;
+    return {
+      id: n.id,
+      label: (n.label || n.id).replace(/cap_\d+_\d+_\w+/, n.label || n.id),
+      title: `<b>${n.label}</b><br/><i>${cat}</i>${n.summary ? '<br/>' + n.summary.slice(0,120) + '…' : ''}`,
+      shape: 'dot',
+      size: 14,
+      color: { background: col.bg, border: col.border, highlight: { background: col.bg, border: 'white' } },
+      font: { color: 'hsl(210,20%,88%)', size: 11, face: 'Inter' },
+      // store metadata for sidebar
+      _meta: n,
+    };
+  }));
+
+  const visEdges = new vis.DataSet(rawGraph.edges.map((e, i) => {
+    const type = e.type || 'tag';
+    const col  = EDGE_COLORS[type] || EDGE_COLORS.tag;
+    return {
+      id: i,
+      from: e.source,
+      to:   e.target,
+      width: type === 'semantic' ? 2 : 1,
+      color: col,
+      smooth: { type: 'continuous', roundness: 0.2 },
+      title: type === 'semantic'
+        ? `Semantic similarity: ${(e.score || 0).toFixed(2)}`
+        : `Shared tag: ${e.shared_tag || ''}`,
+    };
+  }));
+
+  // Update stat counters
+  document.getElementById('stat-nodes').textContent = rawGraph.nodes.length;
+  document.getElementById('stat-edges').textContent = rawGraph.edges.length;
+
+  // Create network
+  const container = document.getElementById('network');
+  const network = new vis.Network(
+    container,
+    { nodes: visNodes, edges: visEdges },
+    {
+      physics: {
+        solver: 'forceAtlas2Based',
+        forceAtlas2Based: { gravitationalConstant: -60, centralGravity: 0.01, springLength: 120, damping: 0.9 },
+        stabilization: { iterations: 200, updateInterval: 50 },
+      },
+      interaction: { hover: true, navigationButtons: false, tooltipDelay: 150, hideEdgesOnDrag: true },
+      layout: { improvedLayout: false },
+      edges: { arrows: { to: { enabled: false } }, selectionWidth: 3 },
+      nodes: { borderWidth: 1.5, borderWidthSelected: 3 },
+    }
+  );
+
+  // Hide loader after stabilization
+  network.once('stabilizationIterationsDone', () => {
+    loader.style.opacity = '0';
+    setTimeout(() => loader.remove(), 400);
+  });
+
+  // ── Sidebar detail ───────────────────────────────────────
+  const detail      = document.getElementById('node-detail');
+  const placeholder = document.getElementById('node-placeholder');
+
+  network.on('click', params => {
+    if (!params.nodes.length) {
+      detail.classList.remove('visible');
+      placeholder.style.display = '';
+      return;
+    }
+    const id   = params.nodes[0];
+    const node = nodeMap[id];
+    if (!node) return;
+
+    const cat = node.category || 'Resources';
+    const col = CAT_COLORS[cat] || CAT_COLORS.Resources;
+    const conns = network.getConnectedNodes(id).length;
+
+    document.getElementById('node-title').textContent = node.label || id;
+    const catEl = document.getElementById('node-category');
+    catEl.textContent = cat;
+    catEl.style.color = col.bg;
+
+    const tagsEl = document.getElementById('node-tags');
+    tagsEl.innerHTML = (node.tags || []).map(t =>
+      `<span class="tag-chip">#${t}</span>`
+    ).join('');
+
+    const summaryEl = document.getElementById('node-summary');
+    summaryEl.textContent = node.summary || '';
+
+    document.getElementById('node-connections').textContent = `${conns} connection${conns !== 1 ? 's' : ''}`;
+
+    placeholder.style.display = 'none';
+    detail.classList.add('visible');
+  });
+
+  // ── Search ───────────────────────────────────────────────
+  const searchEl = document.getElementById('search');
+  searchEl.addEventListener('input', () => {
+    const q = searchEl.value.trim().toLowerCase();
+    if (!q) { resetFilter(); return; }
+    visNodes.forEach(n => {
+      const hit = (n._meta.label || '').toLowerCase().includes(q)
+               || (n._meta.tags || []).some(t => t.toLowerCase().includes(q))
+               || (n._meta.summary || '').toLowerCase().includes(q);
+      visNodes.update({ id: n.id, opacity: hit ? 1 : 0.15 });
+    });
+  });
+
+  function resetFilter() {
+    visNodes.forEach(n => visNodes.update({ id: n.id, opacity: 1 }));
+    searchEl.value = '';
+  }
+
+  // ── Buttons ──────────────────────────────────────────────
+  document.getElementById('btn-fit').addEventListener('click', () => network.fit({ animation: { duration: 600, easingFunction: 'easeInOutQuad' } }));
+  document.getElementById('btn-reset-filter').addEventListener('click', resetFilter);
+})();
+</script>
+</body>
+</html>

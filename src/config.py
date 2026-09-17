@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
 
     # Linking
-    LINK_SIM_THRESHOLD: float = 0.75
+    LINK_SIM_THRESHOLD: float = -1.0
     FAISS_TOP_K: int = 5
 
     # RAG
