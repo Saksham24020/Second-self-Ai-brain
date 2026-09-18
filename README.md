@@ -12,7 +12,7 @@
 
 ---
 
-## 💡 What is Second Self? (In Plain English)
+## 💡 What is Second Self?
 
 Imagine you have a **super-smart digital assistant** sitting next to you. 
 
